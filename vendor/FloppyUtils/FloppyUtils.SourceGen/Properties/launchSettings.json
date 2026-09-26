@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FloppyUtils.SourceGen": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\FloppyUtils\\FloppyUtils.csproj"
+    }
+  }
+}

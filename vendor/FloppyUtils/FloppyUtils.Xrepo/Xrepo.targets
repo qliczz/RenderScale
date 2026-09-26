@@ -1,0 +1,19 @@
+<Project>
+
+  <ItemGroup>
+    <Compile Update="@(Compile)" Visible="false" />
+    <EmbeddedResource Update="@(EmbeddedResource)" Visible="false" />
+    <Content Update="@(Content)" Visible="false" />
+  </ItemGroup>
+
+  <UsingTask TaskName="XrepoPrePackage"
+             AssemblyFile="$(XrepoTaskAssembly)"
+             TaskFactory="TaskHostFactory" />
+
+  <Target Name="XrepoDefaultDalamudPackagerDebug" BeforeTargets="DefaultDalamudPackagerDebug">
+    <XrepoPrePackage ProjectName="$(MSBuildProjectName)"
+                     ProjectNameNoX="$(ProjectNameNoX)"
+                     ProjectDir="$(ProjectDir)" />
+  </Target>
+
+</Project>

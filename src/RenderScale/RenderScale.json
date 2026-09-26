@@ -1,0 +1,13 @@
+{
+  "Name": "斯温·渲染比例（测试版）",
+  "InternalName": "RenderScale",
+  "Author": "斯温",
+  "ApplicableVersion": "any",
+  "Punchline": "独立调整 3D 渲染比例，保留窗口与 HUD 尺寸。",
+  "Description": "国服测试版。25–400% 自定义内部渲染比例，实际尺寸读数、15 秒预览、一键恢复。仅支持核对过的客户端版本，当前要求游戏使用 FSR。高于 100% 会增加 GPU 和显存负载；游戏内画面、恢复与兼容性仍需实测。命令：/swr。基于 0x0ade 的 CustomResolution 与 FloppyUtils，遵循 AGPL-3.0。",
+  "Tags": ["graphics", "resolution", "scaling", "orig:CustomResolution2782"],
+  "RepoUrl": "https://github.com/qliczz/RenderScale",
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": true
+}

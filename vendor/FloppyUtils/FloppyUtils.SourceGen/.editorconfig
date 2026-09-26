@@ -1,0 +1,5 @@
+﻿[*.cs]
+
+# RS2008: Enable analyzer release tracking
+# While this would be a huge no-no in normal sourcegens, this will never be published on NuGet.
+dotnet_diagnostic.RS2008.severity = silent

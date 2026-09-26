@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <ProjectNameNoX>$(MSBuildProjectName.Substring(0, $([MSBuild]::Subtract($(MSBuildProjectName.Length), 1))))</ProjectNameNoX>
+    <XrepoTaskAssembly>$(MSBuildThisFileDirectory)bin\$(Configuration)\netstandard2.0\FloppyUtils.Xrepo.dll</XrepoTaskAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)FloppyUtils.Xrepo.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+</Project>
