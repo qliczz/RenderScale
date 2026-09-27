@@ -12,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,6 +39,52 @@ public sealed class GameSizeState : IAsyncLoadable
     private readonly ThreadedHookProxy<CreateTexture2D> _createTexture2DHook;
 
     private readonly RenderEvents.Scoped _render;
+    private ThreadedHookProxy<DlssEvaluate>? _dlssEvaluate;
+    private nint _dlssModule;
+    public DlssSession Dlss { get; } = new();
+    public bool CanObserveDlss => _dlssEvaluate?.IsEnabled == true;
+    public bool IsRestoring => _wasEnabled && !Service.Config._.GameTarget.IsEnabled;
+    public unsafe bool HasDlssBackend => PostEffectManagerEx.Instance() != null && PostEffectManagerEx.Instance()->DLSS != null;
+    private static bool UseFsrOverrides => !FService.Unloading && Service.Config._.GameTarget.IsEnabled &&
+        Service.Config._.ResolutionScalingMode != ResolutionScalingMode.DLSS;
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate uint DlssEvaluate(nint context, nint handle, nint parameters, nint callback);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    private static extern bool GetModuleHandleExW(uint flags, string name, out nint module);
+    [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true)]
+    private static extern nint GetProcAddress(nint module, string name);
+    [DllImport("kernel32.dll")]
+    private static extern bool FreeLibrary(nint module);
+
+    private uint DlssEvaluateDetour(nint context, nint handle, nint parameters, nint callback)
+    {
+        var token = Dlss.Token;
+        var result = _dlssEvaluate!.OriginalDisposeSafe(context, handle, parameters, callback);
+        Dlss.Observe(token, result, Environment.TickCount64);
+        return result;
+    }
+
+    private void AttachDlssObserver()
+    {
+        // Take a reference to an ALREADY loaded game module; never load or replace
+        // a DLSS DLL from disk. Keep the reference until its hook is disposed.
+        if (!GetModuleHandleExW(0, "nvngx_dlss.dll", out _dlssModule)) return;
+        try
+        {
+            var entry = GetProcAddress(_dlssModule, "NVSDK_NGX_D3D11_EvaluateFeature");
+            if (entry == 0) throw new InvalidOperationException("DLSS D3D11 evaluation export missing");
+            _dlssEvaluate = FService.GameInteropProvider.HookFromAddress<DlssEvaluate>(entry, DlssEvaluateDetour)
+                .On(_render.Unscoped.RenderExecThread);
+            _hooks.Add(_dlssEvaluate);
+        }
+        catch (Exception ex)
+        {
+            FreeLibrary(_dlssModule);
+            _dlssModule = 0;
+            Service.PluginLog.Warning(ex, "DLSS observation unavailable; DLSS previews are blocked");
+        }
+    }
 
     private ComPtr<ID3D11DeviceContext> _d3dctx;
     private ComPtr<ID3D11Device> _d3ddev;
@@ -58,7 +105,7 @@ public sealed class GameSizeState : IAsyncLoadable
     {
         var pfx = PostEffectManagerEx.Instance();
         FService.PluginLog.Debug($"PostEffectManager: 0x{(long) (nint) pfx:X16}");
-        FService.PluginLog.Info($"DLSS: {(pfx->DLSS != null ? "Available" : "Unavailable")}");
+        FService.PluginLog.Info($"DLSS backend object: {(pfx != null && pfx->DLSS != null ? "present (not proof of evaluation)" : "absent")}");
 
         var dev = (DeviceEx*) Device.Instance();
         _d3dctx.Attach(dev->D3D11DeviceContext);
@@ -167,6 +214,7 @@ public sealed class GameSizeState : IAsyncLoadable
 
     public Task LoadAsync(CancellationToken cancel)
     {
+        AttachDlssObserver();
         Service.Framework.Update += Update;
 
         unsafe
@@ -190,6 +238,8 @@ public sealed class GameSizeState : IAsyncLoadable
         await _render.Unscoped.RenderTaskRenderThread;
         await _render.Unscoped.RenderExecThread;
         await disposeHooks;
+        Dlss.Stop();
+        if (_dlssModule != 0) { FreeLibrary(_dlssModule); _dlssModule = 0; }
 
         _samplerLinear.Dispose();
         _samplerPoint.Dispose();
@@ -297,7 +347,9 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
 
         // Check if the backing RTs are the expected size.
         var tex = rtm->GameplayTextureUnk3;
-        if ((wantsTexResize || tex->AllocatedWidth != targetSize.Width || tex->AllocatedHeight != targetSize.Height) &&
+        var dlssResources = cfg.ResolutionScalingMode == ResolutionScalingMode.DLSS ||
+            ConfigGraphicsRezoType == ResolutionScalingMode.DLSS || _original?.Upscale == 2;
+        if (!dlssResources && (wantsTexResize || tex->AllocatedWidth != targetSize.Width || tex->AllocatedHeight != targetSize.Height) &&
             (unloading || !enabled || (!_pendingApply.Active && DateTime.UtcNow >= _nextResize)))
         {
             if (!unloading)
@@ -342,7 +394,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
         Debug.Assert(rtm == RenderTargetManager.Instance());
 
         ref var cfg = ref Service.Config._;
-        if (FService.Unloading || !cfg.GameTarget.IsEnabled)
+        if (!UseFsrOverrides)
         {
             _renderTargetManagerApplyScalingHook.OriginalDisposeSafe(rtm, size, unk1);
             return;
@@ -374,7 +426,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
         Debug.Assert(rtm == RenderTargetManager.Instance());
 
         ref var cfg = ref Service.Config._;
-        if (FService.Unloading || !cfg.GameTarget.IsEnabled)
+        if (!UseFsrOverrides)
         {
             _renderTargetManagerUpdate.OriginalDisposeSafe(rtm, deltaTime);
             return;
@@ -392,7 +444,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
     private unsafe byte RTMDestroyAfterResizeDetour(RenderEvents.ResizeDestroyContext ctx)
     {
         ref var cfg = ref Service.Config._.GameTarget;
-        if (FService.Unloading || !cfg.IsEnabled)
+        if (!UseFsrOverrides)
         {
             return ctx.Invoke();
         }
@@ -408,7 +460,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
     private unsafe void RTMRegenAfterResizeDetour(RenderEvents.ResizeCreateContext ctx)
     {
         ref var cfg = ref Service.Config._.GameTarget;
-        if (FService.Unloading || !cfg.IsEnabled)
+        if (!UseFsrOverrides)
         {
             ctx.Invoke();
             return;
@@ -427,7 +479,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
     private void TaskRenderGraphicsRenderDetour(RenderEvents.TaskRenderGraphicsRenderContext ctx)
     {
         ref var cfg = ref Service.Config._.GameTarget;
-        if (FService.Unloading || !cfg.IsEnabled)
+        if (!UseFsrOverrides)
         {
             ctx.Invoke();
             return;
@@ -447,7 +499,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
 
         ref var cfg = ref Service.Config._;
 
-        if (!FService.Unloading && cfg.GameTarget.IsEnabled)
+        if (UseFsrOverrides)
         {
             var sizeNew = new GameTargetSize();
             mips = Math.Min(mips, sizeNew.Mips);
@@ -478,7 +530,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
         ImmediateSRV* data
     )
     {
-        if (FService.Unloading || !Service.Config._.GameTarget.IsEnabled) return;
+        if (!UseFsrOverrides) return;
         Debug.Assert(im == Device.Instance()->ImmediateContext);
 
         var rtm = (RenderTargetManagerEx*) RenderTargetManager.Instance();
@@ -519,7 +571,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
 
     private unsafe void FsrPushBlitCommandsDetour(PostEffectManagerEx.FsrData* fsr, Texture* swapchain, Context* ctx)
     {
-        if (FService.Unloading || !Service.Config._.GameTarget.IsEnabled)
+        if (!UseFsrOverrides)
         {
             _fsrPushBlitCommandsHook.OriginalDisposeSafe(fsr, swapchain, ctx);
             return;
@@ -577,7 +629,7 @@ GFXUNK {gfx->UnkAffectsRTMGameplayTexture}
     private unsafe HRESULT CreateTexture2DDetour(ID3D11Device* d3ddev, D3D11_TEXTURE2D_DESC* desc, D3D11_SUBRESOURCE_DATA* initialData, ID3D11Texture2D** tex)
     {
         ref var cfg = ref Service.Config._;
-        if (FService.Unloading || !cfg.GameTarget.IsEnabled)
+        if (!UseFsrOverrides)
         {
             return _createTexture2DHook.OriginalDisposeSafe(d3ddev, desc, initialData, tex);
         }

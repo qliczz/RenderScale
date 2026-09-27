@@ -4,8 +4,14 @@
   "Author": "斯温",
   "ApplicableVersion": "any",
   "Punchline": "独立调整 3D 渲染比例，保留窗口与 HUD 尺寸。",
-  "Description": "国服测试版。25–400% 自定义内部渲染比例，实际尺寸读数、15 秒预览、一键恢复。仅支持核对过的客户端版本，当前要求游戏使用 FSR。高于 100% 会增加 GPU 和显存负载；游戏内画面、恢复与兼容性仍需实测。命令：/swr。基于 0x0ade 的 CustomResolution 与 FloppyUtils，遵循 AGPL-3.0。",
-  "Tags": ["graphics", "resolution", "scaling", "orig:CustomResolution2782"],
+  "Description": "国服实验测试版。跟随游戏缩放器：DLSS 可预览 25–100% 自定义比例，FSR 为 25–400%。含实际场景尺寸、DLSS 调用检测、15 秒预览与恢复请求。DLSS 高于 100% 尚未实现，100% 不保证 DLAA；游戏内画面与兼容性尚未验收。仅接受核对过的客户端。命令：/swr。基于 0x0ade 的 CustomResolution 与 FloppyUtils，AGPL-3.0。",
+  "Tags": [
+    "graphics",
+    "resolution",
+    "scaling",
+    "orig:CustomResolution2782",
+    "dlss"
+  ],
   "RepoUrl": "https://github.com/qliczz/RenderScale",
   "LoadRequiredState": 0,
   "LoadSync": false,

@@ -6,7 +6,7 @@
   "signatures": [
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 77,
+      "line": 124,
       "name": "",
       "length": 72,
       "count": 1,
@@ -22,7 +22,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 93,
+      "line": 140,
       "name": "",
       "length": 106,
       "count": 1,
@@ -38,7 +38,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 94,
+      "line": 141,
       "name": "",
       "length": 105,
       "count": 1,
@@ -54,7 +54,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 104,
+      "line": 151,
       "name": "",
       "length": 32,
       "count": 1,
@@ -68,7 +68,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 108,
+      "line": 155,
       "name": "",
       "length": 32,
       "count": 1,
@@ -82,7 +82,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 691,
+      "line": 743,
       "name": "RenderTargetManagerApplyScaling",
       "length": 84,
       "count": 1,
@@ -96,7 +96,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 726,
+      "line": 778,
       "name": "RenderTargetManagerUpdate",
       "length": 73,
       "count": 1,
@@ -110,7 +110,7 @@
     },
     {
       "file": "src/RenderScale/States/GameSizeState.cs",
-      "line": 757,
+      "line": 809,
       "name": "FsrPushBlitCommands",
       "length": 270,
       "count": 1,

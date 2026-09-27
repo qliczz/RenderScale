@@ -5,5 +5,5 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-  <ItemGroup><Compile Include="../../src/RenderScale/ScalePlan.cs" Link="ScalePlan.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/RenderScale/ScalePlan.cs" Link="ScalePlan.cs" /><Compile Include="../../src/RenderScale/DlssSession.cs" Link="DlssSession.cs" /></ItemGroup>
 </Project>
